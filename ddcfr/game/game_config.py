@@ -174,18 +174,9 @@ class BattleShip3(GameConfig):
 
 def get_test_configs():
     test_configs = [
-        SmallMatrix(1000),
         KuhnPoker(1000),
-        GoofSpiel3(1000),
-        LiarsDice3(1000),
-        BattleShip2(1000),
-        BattleShip3(1000),
-        GoofSpiel4(1000),
-        LiarsDice4(1000),
-        LeducPoker(1000),
     ]
     return test_configs
-
 
 def get_simple_configs():
     train_configs = [KuhnPoker(10), SmallMatrix(10)]

@@ -4,6 +4,7 @@ importlib-metadata==4.13.0
 numpy==1.21.6
 open_spiel==1.2
 pandas==1.3.5
+pickle5==0.0.12
 ray==2.0.0
 sacred
 stable-baselines3==1.6.2

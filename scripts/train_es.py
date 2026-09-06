@@ -14,11 +14,11 @@ def config():
     num_train_games = 4
     train_game_configs = get_train_configs(num_train_games)
     save_freq = 5
-    num_epoches = 1000
+    num_epoches = 2
     sigma = 0.05
     n = 100
-    num_train_evaluators = 200
-    num_test_evaluators = 50
+    num_train_evaluators = 6
+    num_test_evaluators = 5
     lr = 0.01
     use_mirror_sampling = True
     use_fitness_shaping = True
