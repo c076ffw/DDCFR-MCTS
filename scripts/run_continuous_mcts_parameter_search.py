@@ -9,7 +9,7 @@ from ddcfr.mcts.continuous_parameter_mcts import (
 from ddcfr.utils.logger import Logger
 
 
-TOTAL_ITERATIONS = 100
+TOTAL_ITERATIONS = 1000
 
 SIMULATIONS = 100
 MAX_DEPTH = 3
