@@ -1,3 +1,57 @@
+# DDCFR-MCTS
+
+> Dynamic Discounted Counterfactual Regret Minimization with Monte Carlo Tree Search <br>
+> DDCFRにおける割引パラメータの決定方法をMCTSに変更した実装
+
+## Overview
+
+本リポジトリでは、Dynamic Discounted Counterfactual Regret Minimization (DDCFR) をベースに、**割引パラメータの決定方法をMonte Carlo Tree Search (MCTS) に変更した手法**を実装・検証する。
+
+元のDDCFRでは、学習したモデルを用いて割引スキームを決定する。本研究では、この決定方法をMCTSによる探索に変更する。
+
+## Original DDCFR
+
+本リポジトリは、以下のDDCFR実装をベースとしている。
+
+[Original DDCFR Repository](https://github.com/c076ffw/DDCFR-MCTS)
+
+> Dynamic Discounted Counterfactual Regret Minimization <br>
+> Hang Xu<sup>*</sup> , Kai Li<sup>*,#</sup>, Haobo Fu, Qiang Fu, Junliang Xing<sup>#</sup>, Jian Cheng <br>
+> ICLR 2024 (Spotlight)
+
+## Branches
+
+* `baseline-original`: 元のDDCFR実装
+* `mcts`: MCTSを用いて割引パラメータを決定する実装
+* `mcts-parameter`: MCTSのパラメータを変更した実装
+* `main`: メインブランチ
+
+---
+
+# Dynamic Discounted Counterfactual Regret Minimization
+
+> Dynamic Discounted Counterfactual Regret Minimization <br>
+> Hang Xu<sup>*</sup> , Kai Li<sup>*,#</sup>, Haobo Fu, Qiang Fu, Junliang Xing<sup>#</sup>, Jian Cheng <br>
+> ICLR 2024 (Spotlight)
+
+## Install DDCFR
+
+Install miniconda3 from [the official website](https://docs.conda.io/en/latest/miniconda.html) and run the following script:
+
+```shell
+bash scripts/install.sh
+```
+
+## Train DDCFR
+
+We use games implemented by [OpenSpiel](https://github.com/deepmind/open_spiel) [1] and [PokerRL](https://github.com/EricSteinberger/PokerRL) [2]. To easily run the code for training, we provide a unified interface. Each experiment will generate an experiment id `logid` and create a unique directory in `logs/es`. Models will be stored in the folder `logs/es/{log_id}/model`. Run the following script to start training.
+
+```bash
+conda activate DDCFR
+python scripts/train_es.py with save_log=True
+```
+
+
 # Dynamic Discounted Counterfactual Regret Minimization
 
 > Dynamic Discounted Counterfactual Regret Minimization <br>
