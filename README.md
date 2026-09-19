@@ -22,9 +22,6 @@
 ## Branches
 
 * `baseline-original`: 元のDDCFR実装
-* `mcts`: MCTSを用いて割引パラメータを決定する実装
-* `mcts-parameter`: MCTSのパラメータを変更した実装
-* `main`: メインブランチ
 
 ---
 
