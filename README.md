@@ -13,7 +13,7 @@
 
 本リポジトリは、以下のDDCFR実装をベースとしている。
 
-[Original DDCFR Repository](https://github.com/c076ffw/DDCFR-MCTS)
+[Original DDCFR Repository]https://github.com/rpSebastian/DDCFR.git
 
 > Dynamic Discounted Counterfactual Regret Minimization <br>
 > Hang Xu<sup>*</sup> , Kai Li<sup>*,#</sup>, Haobo Fu, Qiang Fu, Junliang Xing<sup>#</sup>, Jian Cheng <br>
