@@ -1,5 +1,5 @@
-. "/home/xuhang/miniconda3/etc/profile.d/conda.sh"
-conda activate DDCFR
+#. "/home/xuhang/miniconda3/etc/profile.d/conda.sh"
+#conda activate DDCFR
 script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 main_dir=$script_dir/../
 cd "$main_dir"

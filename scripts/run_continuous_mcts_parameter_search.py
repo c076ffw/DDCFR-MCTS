@@ -12,7 +12,7 @@ from ddcfr.utils.logger import Logger
 TOTAL_ITERATIONS = 1000
 
 SIMULATIONS = 100
-MAX_DEPTH = 3
+MAX_DEPTH = 50
 TAU = 5
 
 
@@ -31,22 +31,8 @@ def main():
         logger,
     )
 
-    mcts = ContinuousParameterMCTS(
-        simulations=SIMULATIONS,
-        max_depth=MAX_DEPTH,
-
-        exploration_constant=math.sqrt(2),
-
-        pw_k=2.0,
-        pw_alpha=0.5,
-
-        alpha_range=(0.0, 5.0),
-        beta_range=(-5.0, 0.0),
-        gamma_range=(0.0, 5.0),
-
-        tau=TAU,
-
-        seed=0,
+    mcts = ContinuousParameterMCTS( simulations=SIMULATIONS,max_depth=MAX_DEPTH,exploration_constant=math.sqrt(2),
+        pw_k=2.0,pw_alpha=0.5,alpha_range=(0.0, 5.0),beta_range=(-5.0, 0.0),gamma_range=(0.0, 5.0),tau=TAU,seed=0,
     )
 
     selected_history = []
@@ -72,9 +58,7 @@ def main():
 
         search_start = time.perf_counter()
 
-        best_action, stats = mcts.search(
-            solver
-        )
+        best_action, stats = mcts.search(solver)
 
         search_time = (
             time.perf_counter()
@@ -118,21 +102,17 @@ def main():
         # ======================================
 
         for _ in range(tau):
-
             if (
                 solver.num_iterations
                 >= TOTAL_ITERATIONS
             ):
                 break
-
             solver.num_iterations += 1
-
             solver.iteration(
                 alpha=alpha,
                 beta=beta,
                 gamma=gamma,
             )
-
         conv_after = solver.calc_conv()
 
         print(
