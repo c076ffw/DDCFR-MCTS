@@ -1,4 +1,5 @@
 import copy
+from numbers import Integral
 
 from ddcfr.cfr import DDCFRSolver
 
@@ -30,14 +31,28 @@ def clone_solver(solver):
     return sim_solver
 
 
+def apply_action(solver, action):
+    """指定したparameterをtau iterationだけsolverへ適用する。
+
+    solverを直接更新する。探索では必ずコピーしたsolverに適用する。
+    exploitabilityは計算せず、呼び出し側で必要な時点に評価する。
+    """
+
+    alpha, beta, gamma, tau = action
+    if isinstance(tau, bool) or not isinstance(tau, Integral) or tau <= 0:
+        raise ValueError("tau must be a positive integer.")
+
+    for _ in range(tau):
+        solver.num_iterations += 1
+        solver.iteration(alpha=alpha, beta=beta, gamma=gamma)
+
+
 def simulate_action(solver, action):
     """
     solverを壊さずに、指定した
     (alpha, beta, gamma, tau)
     を仮想的に実行する。
     """
-
-    alpha, beta, gamma, tau = action
 
     # 本物とは別のsolverを作る
     sim_solver = clone_solver(solver)
@@ -46,14 +61,7 @@ def simulate_action(solver, action):
     conv_before = sim_solver.calc_conv()
 
     # tau iterationだけ仮想実行
-    for _ in range(tau):
-        sim_solver.num_iterations += 1
-
-        sim_solver.iteration(
-            alpha=alpha,
-            beta=beta,
-            gamma=gamma,
-        )
+    apply_action(sim_solver, action)
 
     # 実行後のexploitability
     conv_after = sim_solver.calc_conv()
