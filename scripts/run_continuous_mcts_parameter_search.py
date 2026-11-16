@@ -1,11 +1,14 @@
 import argparse
 import math
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 from ddcfr.cfr import DDCFRSolver
 from ddcfr.game.game_config import KuhnPoker
 from ddcfr.mcts.full_horizon_mcts import FullHorizonParameterMCTS
 from ddcfr.mcts.simulator import apply_action
+from ddcfr.utils.convergence import ConvergenceRecorder
 from ddcfr.utils.logger import Logger
 
 
@@ -39,6 +42,18 @@ def main(argv=None):
     parser.add_argument("--tau", type=positive_int, default=TAU)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
+        "--eval-interval",
+        type=positive_int,
+        default=1,
+        help="Record actual exploitability every N iterations, plus each block end",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Result directory; default: results/ContinuousMCTS/KuhnPoker/<UTC timestamp>",
+    )
+    parser.add_argument(
         "--simulation-budget",
         type=nonnegative_int,
         default=None,
@@ -59,6 +74,25 @@ def main(argv=None):
                 "--simulation-budget must be at least --iterations so that one "
                 "rollout can reach the final iteration; use 0 for unlimited"
             )
+
+    output_dir = args.output_dir
+    if output_dir is None:
+        run_name = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
+        output_dir = (
+            Path(__file__).resolve().parents[1]
+            / "results"
+            / "ContinuousMCTS"
+            / "KuhnPoker"
+            / run_name
+        )
+    output_dir = output_dir.resolve()
+    try:
+        recorder = ConvergenceRecorder(output_dir, "KuhnPoker - Full-horizon MCTS")
+    except FileExistsError:
+        parser.error(
+            f"{output_dir / 'convergence.csv'} already exists; "
+            "choose a new --output-dir"
+        )
 
     logger = Logger(writer_strings=[])
     try:
@@ -87,6 +121,8 @@ def main(argv=None):
         print(f"tree depth  : {args.max_depth}")
         print(f"tau         : {args.tau}")
         print(f"seed        : {args.seed}")
+        print(f"eval interval: {args.eval_interval}")
+        print(f"results     : {output_dir}")
         print(
             "search budget: "
             f"{simulation_budget if simulation_budget is not None else 'unlimited'} "
@@ -97,6 +133,8 @@ def main(argv=None):
         total_mcts_time = 0.0
         search_history = []
         selected_history = []
+        recorder.record(0, solver.calc_conv(), time.perf_counter() - total_start)
+        recorder.save_plot()
 
         while solver.num_iterations < args.iterations:
             iteration = solver.num_iterations
@@ -127,8 +165,22 @@ def main(argv=None):
             print(f"MCTS time={search_time:.4f} sec")
 
             # 次のブロックのみ本物のsolverに適用し、その状態から再探索する。
-            apply_action(solver, action)
-            conv_after = solver.calc_conv()
+            # 仮実行の中間評価は増やさず、実測した収束度だけを記録する。
+            block_end = solver.num_iterations + tau
+            for _ in range(tau):
+                apply_action(solver, (alpha, beta, gamma, 1))
+                if (
+                    solver.num_iterations % args.eval_interval == 0
+                    or solver.num_iterations == block_end
+                ):
+                    recorder.record(
+                        solver.num_iterations,
+                        solver.calc_conv(),
+                        time.perf_counter() - total_start,
+                        action,
+                    )
+            conv_after = recorder.history[-1]["exploitability"]
+            recorder.save_plot()
             print(f"actual conv={conv_after:.10f}")
             selected_history.append(
                 {
@@ -156,6 +208,8 @@ def main(argv=None):
         print(f"actual final exploitability    : {final_conv:.10f}")
         print(f"total time                     : {total_time:.4f} sec")
         print(f"total MCTS time                : {total_mcts_time:.4f} sec")
+        print(f"convergence CSV                : {recorder.csv_path}")
+        print(f"convergence graph              : {recorder.plot_path}")
 
         print("\n===================================")
         print("ACTUAL PARAMETER HISTORY")
@@ -175,9 +229,14 @@ def main(argv=None):
             "selected_history": selected_history,
             "final_conv": final_conv,
             "iterations": solver.num_iterations,
+            "convergence_history": recorder.history,
+            "output_dir": output_dir,
         }
     finally:
-        logger.close()
+        try:
+            recorder.close()
+        finally:
+            logger.close()
 
 
 if __name__ == "__main__":

@@ -34,7 +34,7 @@ MCTS の探索と、対戦時のカード配布・行動選択には、それぞ
 python scripts/play_ddcfr_vs_mcts.py --hands 100 --seed 0 --mcts-seed 7 --match-seed 42
 ```
 
-結果を保存する場合は、**まだ存在しないディレクトリ**を指定します。
+結果は実行ごとに `results/DDCFR_vs_MCTS/<UTC日時>/` に自動保存します。保存先を変更する場合は、**まだ存在しないディレクトリ**を指定します。
 
 ```bash
 python scripts/play_ddcfr_vs_mcts.py \
@@ -44,10 +44,14 @@ python scripts/play_ddcfr_vs_mcts.py \
 - `result.json`：設定 (`config`)、両者の学習履歴・時間・exploitability (`training`)、対戦の勝敗集計 (`matches`)、厳密な対戦期待値 (`exact`)。
 - `matches.csv`：対戦番号 (`hand`)、DDCFR の席 (`ddcfr_seat`、0 が先手・1 が後手)、勝者 (`winner`)。
 - `training.csv`：両者が各ブロックで使用したパラメータ、適用区間、exploitability、MCTS の探索量。
+- `convergence.csv`：両者の初期状態と各学習ブロック終了時の `agent, iteration, exploitability`。
+- `convergence.png`：DDCFR と DDCFR＋MCTS の収束曲線を重ねたグラフ。横軸は実際の学習イテレーション数、縦軸は exploitability の対数目盛で、小さいほど戦略の隙が小さいことを表します。
+
+収束曲線には実際に学習した solver の平均戦略の評価値を使い、MCTS 内の仮実行の値は含めません。学習済みモデルでは選択されるブロック長が変わるため、両者の評価時点が異なる場合があります。各点の間は線で結びます。
 
 実際に使用した MCTS の探索シードと対戦シードは、`result.json` の `config.mcts_seed` と `config.match_seed` に記録します。自動生成されたシードも `--mcts-seed` と `--match-seed` に指定すれば再利用できます。
 
-`--output` を省略すると画面表示のみです。保存先が既に存在する場合は、学習開始前にエラーにして上書きを防ぎます。
+`--output` を省略すると実行ごとに新しい保存先を作ります。指定した保存先が既に存在する場合は、学習開始前にエラーにして上書きを防ぎます。
 
 ## 結果の読み方
 
@@ -66,7 +70,7 @@ DDCFRが先手（50戦）: 24勝 26敗 0分
 DDCFRが後手（50戦）: 22勝 28敗 0分
 ```
 
-`--output` を指定した場合は、各試合の勝者も `matches.csv` に保存します。
+各試合の勝者も `matches.csv` に保存します。
 
 対戦期待値は、今回学習した同じ二つの平均戦略について、全カード配布・全行動を確率で重み付けして計算します。先手・後手を半分ずつ担当したときの 1 戦あたりの期待利益で、単位はチップ、正が利益です。抽選した対戦の実測平均や勝率ではありません。ゼロ和ゲームなので両者の期待値の和は、浮動小数点の誤差を除いてゼロになります。`exact.ddcfr_as_player0` と `exact.ddcfr_as_player1` には DDCFR の席別期待値も保存します。
 

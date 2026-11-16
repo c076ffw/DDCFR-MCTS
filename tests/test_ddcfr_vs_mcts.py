@@ -217,6 +217,13 @@ class ExactEvaluationTest(unittest.TestCase):
 
 
 class RunnerIntegrationTest(unittest.TestCase):
+    def setUp(self):
+        output = tempfile.TemporaryDirectory()
+        self.addCleanup(output.cleanup)
+        patcher = mock.patch.object(runner, "DEFAULT_OUTPUT_ROOT", Path(output.name))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_existing_output_directory_is_rejected_without_changing_contents(self):
         with tempfile.TemporaryDirectory() as temp_directory:
             output = Path(temp_directory)
@@ -287,8 +294,22 @@ class RunnerIntegrationTest(unittest.TestCase):
                 trained["ddcfr"].average_policy(),
                 trained["mcts"].average_policy(),
             ))
-            for filename in ("result.json", "matches.csv", "training.csv"):
+            for filename in (
+                "result.json", "matches.csv", "training.csv",
+                "convergence.csv", "convergence.png",
+            ):
                 self.assertTrue((output / filename).is_file(), filename)
+            with (output / "convergence.csv").open(newline="") as stream:
+                convergence = list(csv.DictReader(stream))
+            for agent in ("ddcfr", "mcts"):
+                curve = [row for row in convergence if row["agent"] == agent]
+                self.assertEqual([int(row["iteration"]) for row in curve], [0, 3, 5])
+                self.assertAlmostEqual(float(curve[0]["exploitability"]), 11 / 24)
+                self.assertEqual(
+                    float(curve[-1]["exploitability"]),
+                    result["training"][agent]["exploitability"],
+                )
+            self.assertEqual((output / "convergence.png").read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
             saved = json.loads((output / "result.json").read_text())
             self.assertEqual(saved["config"]["mcts_seed"], 123456789)
             self.assertEqual(saved["config"]["match_seed"], 987654321)
@@ -411,6 +432,9 @@ class RunnerIntegrationTest(unittest.TestCase):
             ])
 
         hands = result["config"]["hands"]
+        output_folder = Path(result["config"]["output"])
+        self.assertTrue((output_folder / "convergence.csv").is_file())
+        self.assertTrue((output_folder / "convergence.png").is_file())
         self.assertEqual(result["matches"]["hands"], hands)
         self.assertEqual(result["matches"]["by_seat"]["first"]["games"], hands // 2)
         self.assertEqual(result["matches"]["by_seat"]["second"]["games"], hands // 2)

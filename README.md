@@ -37,10 +37,31 @@ python scripts/run_continuous_mcts_parameter_search.py \
 
 実行設定とブロックごとの再探索は `scripts/run_continuous_mcts_parameter_search.py`、探索木・候補生成・UCB選択・終端評価・報酬の集計は `ddcfr/mcts/full_horizon_mcts.py`、solverの複製とパラメータ適用は `ddcfr/mcts/simulator.py` が担当する。旧連続MCTSの実装と専用確認スクリプトは削除し、必要な共通処理を `full_horizon_mcts.py` に集約している。
 
+### 強さの収束状況の記録とグラフ
+
+上記スクリプトは、初期状態（iteration 0）と実際のDDCFR更新後の **exploitability** を記録する。値が小さいほど相手に攻略されにくい戦略を表す。MCTS内の仮実行の評価値は、この収束曲線には含めない。
+
+結果は実行ごとに `results/ContinuousMCTS/KuhnPoker/<UTC日時>/` に保存する。
+
+- `convergence.csv`: 反復回数、exploitability、開始からの経過秒数、適用した `alpha, beta, gamma, tau`。`tau` は選択されたブロックの長さで、初期状態のパラメータ欄は空欄。経過時間にはMCTS探索・評価・グラフ保存の時間を含む。
+- `convergence.png`: 横軸をDDCFRの反復回数、縦軸をexploitabilityの対数目盛にしたグラフ。
+
+CSVは評価のたびに書き出し、グラフは各ブロック終了時と終了処理で更新する。Ctrl+Cで停止した場合も、それまでに記録した測定値とグラフを残す。デフォルトは毎反復評価で、`--eval-interval` で間隔を変更できる。初期状態・各ブロック末尾・最終反復は、指定間隔にかかわらず記録する。
+
+```bash
+python scripts/run_continuous_mcts_parameter_search.py \
+  --iterations 100 --simulations 5 --max-depth 2 --tau 5 \
+  --eval-interval 5 --output-dir results/my_convergence_run
+```
+
+保存先を指定した場合、既存の `convergence.csv` は上書きしない。再実行時は別の保存先を指定するか、`--output-dir` を省略する。
+
+DDCFR と DDCFR＋MCTS の両方を比較する場合は、`python scripts/play_ddcfr_vs_mcts.py` を使うと、初期状態と各ブロック末尾での両者の収束曲線を `results/DDCFR_vs_MCTS/<UTC日時>/` に自動保存する。`--output <新しい保存先>` で保存先を変更できる。詳細は [対戦比較スクリプトの説明](scripts/README_ddcfr_vs_mcts.md) を参照。
+
 最終時点までの仮実行、元のsolverの状態保持、予算制限、ブロックごとの再探索は、次のテストで確認できる。
 
 ```bash
-python -m unittest tests.test_full_horizon_mcts
+python -m unittest tests.test_full_horizon_mcts tests.test_convergence
 ```
 
 ## Original DDCFR

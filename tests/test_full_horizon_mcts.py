@@ -1,6 +1,9 @@
 import copy
+import csv
 import math
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import mock
 
 from ddcfr.mcts.full_horizon_mcts import FullHorizonParameterMCTS
@@ -302,7 +305,7 @@ class FullHorizonParameterMCTSIntegrationTest(unittest.TestCase):
             search_start_iterations.append(solver.num_iterations)
             return original_search(mcts, solver)
 
-        with mock.patch.object(
+        with TemporaryDirectory() as folder, mock.patch.object(
             FullHorizonParameterMCTS,
             "search",
             autospec=True,
@@ -315,14 +318,78 @@ class FullHorizonParameterMCTSIntegrationTest(unittest.TestCase):
                     "--max-depth", "1",
                     "--tau", "4",
                     "--seed", "3",
+                    "--output-dir", folder,
                 ]
             )
+            with (Path(folder) / "convergence.csv").open() as file:
+                rows = list(csv.DictReader(file))
+            self.assertTrue((Path(folder) / "convergence.png").is_file())
 
         self.assertEqual(search.call_count, 3)
         self.assertEqual(search_start_iterations, [0, 4, 8])
         self.assertEqual(result["iterations"], 9)
         self.assertEqual(len(result["selected_history"]), 3)
         self.assertTrue(math.isfinite(result["final_conv"]))
+        # Only actual solver steps belong in the curve, including iteration 0.
+        self.assertEqual([int(row["iteration"]) for row in rows], list(range(10)))
+        self.assertEqual(len(result["convergence_history"]), 10)
+        self.assertEqual(float(rows[-1]["exploitability"]), result["final_conv"])
+        self.assertAlmostEqual(float(rows[0]["exploitability"]), 11 / 24)
+        self.assertEqual(rows[0]["alpha"], "")
+        elapsed = [float(row["elapsed_seconds"]) for row in rows]
+        self.assertEqual(elapsed, sorted(elapsed))
+        for row in rows[1:]:
+            block = result["selected_history"][(int(row["iteration"]) - 1) // 4]
+            for parameter in ("alpha", "beta", "gamma", "tau"):
+                self.assertEqual(float(row[parameter]), block[parameter])
+        # Measuring between updates must not change the learned strategy.
+        logger = runner.Logger(writer_strings=[])
+        self.addCleanup(logger.close)
+        reference = runner.DDCFRSolver(runner.KuhnPoker(iterations=9), logger)
+        for block in result["selected_history"]:
+            action = tuple(block[key] for key in ("alpha", "beta", "gamma", "tau"))
+            apply_action(reference, action)
+            self.assertEqual(reference.calc_conv(), block["conv_after"])
+
+    def test_runner_records_interval_and_block_ends_including_short_final_block(self):
+        from scripts import run_continuous_mcts_parameter_search as runner
+
+        with TemporaryDirectory() as folder, mock.patch("builtins.print"):
+            result = runner.main([
+                "--iterations", "10", "--simulations", "1", "--tau", "4",
+                "--max-depth", "1", "--eval-interval", "3",
+                "--output-dir", folder,
+            ])
+            with (Path(folder) / "convergence.csv").open() as file:
+                rows = list(csv.DictReader(file))
+
+        self.assertEqual([int(row["iteration"]) for row in rows], [0, 3, 4, 6, 8, 9, 10])
+        self.assertEqual(float(rows[-1]["exploitability"]), result["final_conv"])
+        self.assertEqual(int(rows[-1]["tau"]), 2)
+
+    def test_runner_keeps_measurements_and_plot_when_search_is_interrupted(self):
+        from scripts import run_continuous_mcts_parameter_search as runner
+
+        original_search = FullHorizonParameterMCTS.search
+
+        def interrupt_second_search(mcts, solver):
+            if solver.num_iterations > 0:
+                raise KeyboardInterrupt
+            return original_search(mcts, solver)
+
+        with TemporaryDirectory() as folder, mock.patch.object(
+            FullHorizonParameterMCTS, "search", autospec=True,
+            side_effect=interrupt_second_search,
+        ), mock.patch("builtins.print"):
+            with self.assertRaises(KeyboardInterrupt):
+                runner.main([
+                    "--iterations", "9", "--simulations", "1", "--tau", "4",
+                    "--max-depth", "1", "--output-dir", folder,
+                ])
+            with (Path(folder) / "convergence.csv").open() as file:
+                rows = list(csv.DictReader(file))
+            self.assertEqual([int(row["iteration"]) for row in rows], list(range(5)))
+            self.assertGreater((Path(folder) / "convergence.png").stat().st_size, 0)
 
 
 if __name__ == "__main__":

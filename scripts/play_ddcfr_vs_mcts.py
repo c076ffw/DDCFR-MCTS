@@ -13,10 +13,12 @@ import random
 import secrets
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_OUTPUT_ROOT = ROOT / "results" / "DDCFR_vs_MCTS"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -24,6 +26,7 @@ from ddcfr.cfr import DDCFRSolver
 from ddcfr.game.game_config import KuhnPoker
 from ddcfr.mcts.full_horizon_mcts import FullHorizonParameterMCTS
 from ddcfr.mcts.simulator import apply_action
+from ddcfr.utils.convergence import save_convergence_plot
 from ddcfr.utils.logger import Logger
 
 
@@ -265,6 +268,24 @@ def save_results(folder, result, records):
         for agent, training in result["training"].items():
             for row in training["history"]:
                 writer.writerow(dict(agent=agent, **row))
+    convergence = {}
+    with (folder / "convergence.csv").open("x", encoding="utf-8", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=["agent", "iteration", "exploitability"])
+        writer.writeheader()
+        for agent, training in result["training"].items():
+            history = training["history"]
+            curve = [{
+                "iteration": history[0]["start_iteration"],
+                "exploitability": history[0]["conv_before"],
+            }]
+            curve.extend({
+                "iteration": row["end_iteration"],
+                "exploitability": row["conv_after"],
+            } for row in history)
+            for row in curve:
+                writer.writerow(dict(agent=agent, **row))
+            convergence["DDCFR" if agent == "ddcfr" else "DDCFR+MCTS"] = curve
+    save_convergence_plot(convergence, folder / "convergence.png", "KuhnPoker convergence")
 
 
 def main(argv=None):
@@ -294,13 +315,18 @@ def main(argv=None):
     parser.add_argument("--simulation-budget", type=nonnegative_int, default=None,
                         help="simulated iterations per search; 0=unlimited; "
                         "default=max(iterations, simulations * max_depth * tau)")
-    parser.add_argument("--output", type=Path, help="save JSON/CSV to a new directory")
+    parser.add_argument("--output", type=Path,
+                        help="save JSON/CSV and a convergence graph to a new directory; "
+                        "default: results/DDCFR_vs_MCTS/<UTC timestamp>")
     args = parser.parse_args(argv)
     if args.hands < 2 or args.hands % 2:
         parser.error("--hands must be an even integer >= 2")
     if args.baseline == "learned" and not args.model.is_file():
         parser.error(f"model not found: {args.model}")
-    if args.output is not None and args.output.exists():
+    if args.output is None:
+        run_name = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
+        args.output = DEFAULT_OUTPUT_ROOT / run_name
+    if args.output.exists():
         parser.error(f"--output must be a new directory: {args.output}")
     for name in ("alpha_range", "beta_range", "gamma_range"):
         low, high = getattr(args, name)
@@ -341,8 +367,7 @@ def main(argv=None):
         }
         print_matches(matches)
         print_metrics(exact, result["training"])
-        if args.output is not None:
-            save_results(args.output, result, records)
+        save_results(args.output, result, records)
         return result
     finally:
         logger.close()
